@@ -353,10 +353,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private void saveSegment(double orien, double distance) {
         try {
-            JSONObject sg = new JSONObject();
-            sg.put("direction", orien);
-            sg.put("distance", distance);
-            sgList.put(sg);
+            if (last_distance != 0 && last_distance != sg_distance) {
+                JSONObject sg = new JSONObject();
+                sg.put("direction", orien);
+                sg.put("distance", distance);
+                sgList.put(sg);
+            }
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -698,6 +700,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
+                    last_orien = Last_Orein;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
@@ -705,7 +708,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     else {
                         sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
                     }
-                    last_orien = Last_Orein;
                 }
 //                else if(is_last_change_pose){
 //                    resetOrien += (Last_Orein-data_gyroscope.Orein);
@@ -744,12 +746,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
+                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
                         sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
                     }
-                    last_orien = Last_Orein;
                 }
                 else if(Math.abs(Last_Orein - data_gyroscope.Orein) < THESHOLD_TURN){
                     resetOrien += (Last_Orein-data_gyroscope.Orein);
@@ -774,12 +776,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
+                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
                         sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
                     }
-                    last_orien = Last_Orein;
                 }
                 else{
                     Last_Orein = data_gyroscope.Orein;
@@ -802,12 +804,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
+                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
                         sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
                     }
-                    last_orien = Last_Orein;
                 }
                 ST += EachStepDT;
 
@@ -901,12 +903,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
+                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
                         sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
                     }
-                    last_orien = Last_Orein;
 
 //                    PDR_arrayList.add(new PDRinfo(GlobalStepsList.getLast().Steps - CheckStepChange,data_gyroscope.Orein));
 //                    freeDraw.addPath(GlobalStepsList.getLast().Steps - CheckStepChange, data_gyroscope.Orein,1);
