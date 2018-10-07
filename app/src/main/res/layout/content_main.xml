@@ -91,7 +91,7 @@
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="360dp">
+            android:layout_height="300dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -99,16 +99,15 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/textView_TempData"
+                    android:id="@+id/textView_PkData"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="TextView" />
 
                 <TextView
-                    android:id="@+id/textView_PkData"
+                    android:id="@+id/textView_TempData"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="TextView" />
+                    android:layout_height="wrap_content" />
 
                 <LinearLayout
                     android:id="@+id/drawLayout"

@@ -24,6 +24,10 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -182,6 +186,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private double last_orien = 90;
     private double sg_distance = 0;
     private double last_distance = 0;
+    private JSONObject pkData;
+    private JSONArray sgList;
 
     private Calendar CalendarForDir = Calendar.getInstance();
     int SecondForDir = CalendarForDir.get(Calendar.SECOND);
@@ -209,8 +215,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         if(StartAPP){
                             BT_Stat.setText("Start");
                             editText_dest.setEnabled(true);
+                            saveSegment(last_orien, sg_distance);
+                            createPkData();
+                            TV_pkData.setText(sgList + "\n");
                         }
                         else{
+                            pkData = new JSONObject();
+                            sgList = new JSONArray();
                             BT_Stat.setText("Stop");
                             editText_dest.setEnabled(false);
                         }
@@ -314,9 +325,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         editText_dest = (EditText)findViewById(R.id.editText_dest);
     }
 
-//    private void createPkData() {
-//
-//    }
+    private void createPkData() {
+        try{
+            pkData.put("user_id", "12345678");
+            pkData.put("route_id", "123");
+            pkData.put("destination", dest);
+            pkData.put("bpre", "bcon1");
+            pkData.put("bcur", "bcon2");
+            pkData.put("sgList", sgList);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private void saveSegment(double orien, double distance) {
+        try {
+            JSONObject sg = new JSONObject();
+            sg.put("direction", orien);
+            sg.put("distance", distance);
+            sgList.put(sg);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
 
     private void startSensor() {
         sensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
@@ -644,6 +676,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
+                        saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
                     }
                     else {
@@ -687,6 +720,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
+                        saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
                     }
                     else {
@@ -716,6 +750,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
+                        saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
                     }
                     else {
@@ -743,6 +778,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
+                        saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
                     }
                     else {
@@ -841,6 +877,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
+                        saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
                     }
                     else {
@@ -3361,7 +3398,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     String sg_dis = theClass.mDecimalFormat.format(theClass.sg_distance);
                     if (! last_dis.equals(sg_dis)) {
                         String dataText = "orien: " + theClass.last_orien + ", distance: " + sg_dis + "\n";
-                        theClass.TV_pkData.setText(theClass.TV_pkData.getText() + dataText);
+                        theClass.TV_tempData.setText(theClass.TV_tempData.getText() + dataText);
                     }
 
                     break;
