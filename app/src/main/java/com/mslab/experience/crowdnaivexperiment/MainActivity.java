@@ -166,8 +166,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     List<Data_Gyroscope> DataOfOrein =  Collections.synchronizedList(new LinkedList<Data_Gyroscope>());
     private boolean StartSensor;
     private float resetOrien = 0;
-    private TextView TV_Step_Count,TV_Start,TV_Orien,TV_Dest,TV_textview;
-    private EditText editText ;
+    private TextView TV_Step_Count,TV_Start,TV_Orien,TV_Dist,TV_textview,TV_tempData,TV_dest,TV_pkData;
+    private EditText editText, editText_dest;
     private Button BT_Stat;
     private boolean StartAPP = false;
     private int reset_count = 0;
@@ -177,8 +177,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private double x = 0;
     private double y = 21;
     private double length = 0.7;
-
-
+    
+    private String dest;
+    private double last_orien = 90;
+    private double sg_distance = 0;
+    private double last_distance = 0;
 
     private Calendar CalendarForDir = Calendar.getInstance();
     int SecondForDir = CalendarForDir.get(Calendar.SECOND);
@@ -199,25 +202,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onClick(View v) {
         switch (v.getId()){
             case R.id.button_Start:{
-
                 mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
 //                        TipHelper.PlaySound(getBaseContext());
                         if(StartAPP){
                             BT_Stat.setText("Start");
+                            editText_dest.setEnabled(true);
                         }
                         else{
                             BT_Stat.setText("Stop");
+                            editText_dest.setEnabled(false);
                         }
                         StartAPP = !StartAPP;
 
                         length = Double.valueOf(editText.getText().toString());
+                        sg_distance = 0;
+                        last_distance = 0;
 
-                        TV_textview.setVisibility(View.INVISIBLE);
-                        editText.setVisibility(View.INVISIBLE);
+                        TV_textview.setVisibility(View.GONE);
+                        editText.setVisibility(View.GONE);
+                        dest = editText_dest.getText().toString();
+                        TV_tempData.setText("Destination: " + dest);
                     }
-                }, 3000);
+                }, 1000);
             }
         }
     }
@@ -293,12 +301,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private void findview(){
         TV_Step_Count = (TextView)findViewById(R.id.textView_Step_Count);
         TV_Orien = (TextView)findViewById(R.id.textView_Orientation);
-        TV_Dest = (TextView)findViewById(R.id.textView_distance);
+        TV_Dist = (TextView)findViewById(R.id.textView_distance);
         TV_Start = (TextView)findViewById(R.id.textView_Start);
         BT_Stat = (Button) findViewById(R.id.button_Start);
         BT_Stat.setOnClickListener(this);
-        TV_textview =(TextView)findViewById(R.id.textView2);
+        TV_textview = (TextView)findViewById(R.id.textView2);
         editText = (EditText)findViewById(R.id.editText);
+        TV_tempData = (TextView)findViewById(R.id.textView_TempData);
+        TV_pkData = (TextView)findViewById(R.id.textView_PkData);
+//        TV_dest = (TextView)findViewById(R.id.textView_destination);
+        editText_dest = (EditText)findViewById(R.id.editText_dest);
     }
     private void startSensor() {
         sensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
@@ -594,6 +606,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         float DT = ET-ST;
         float EachStepDT = DT/(float)NumberOfstep;
         boolean is_last_change_pose = false;
+        double delta_x, delta_y;
         synchronized(DataOfOrein) {
             Iterator<Data_Gyroscope> iterator = DataOfOrein.iterator();
             for(int i = 0;i<NumberOfstep;i++){
@@ -612,13 +625,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     bd.putFloat("Orien",data_gyroscope.Orein + resetOrien);
                     bd.putInt("PathID",1);
                     ms.setData(bd);
-                    x -= Math.cos(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
-                    y -= Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    delta_x = Math.cos(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    delta_y = Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    x -= delta_x;
+                    y -= delta_y;
 
                     writePDR("GC_First :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
                     First_StepsGet = false;
                     checkfunction(data_gyroscope.Gravity_Value);
                     Last_Orein = data_gyroscope.Orein;
+
+                    double now_orein = Last_Orein + resetOrien;
+                    last_distance = sg_distance;
+                    if (Math.abs(last_orien - now_orein) > 45) {
+                        sg_distance = 0;
+                    }
+                    else {
+                        sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
+                    }
+                    last_orien = Last_Orein;
                 }
 //                else if(is_last_change_pose){
 //                    resetOrien += (Last_Orein-data_gyroscope.Orein);
@@ -644,12 +669,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     bd.putFloat("Orien",data_gyroscope.Orein + resetOrien);
                     bd.putInt("PathID",1);
                     ms.setData(bd);
-                    x -= Math.cos(Math.toRadians((data_gyroscope.Orein + resetOrien) ))*length;
-                    y -= Math.sin(Math.toRadians((data_gyroscope.Orein + resetOrien)))*length;
+                    delta_x = Math.cos(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    delta_y = Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    x -= delta_x;
+                    y -= delta_y;
 
                     writePDR("GC_Change :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
                     Last_Orein = data_gyroscope.Orein;
                     reset_count++;
+
+                    double now_orein = Last_Orein + resetOrien;
+                    last_distance = sg_distance;
+                    if (Math.abs(last_orien - now_orein) > 45) {
+                        sg_distance = 0;
+                    }
+                    else {
+                        sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
+                    }
+                    last_orien = Last_Orein;
                 }
                 else if(Math.abs(Last_Orein - data_gyroscope.Orein) < THESHOLD_TURN){
                     resetOrien += (Last_Orein-data_gyroscope.Orein);
@@ -662,11 +699,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     bd.putInt("PathID",1);
                     ms.setData(bd);
                     UI_Handler.sendMessage(ms);
-                    x -= Math.cos(Math.toRadians((data_gyroscope.Orein + resetOrien) ))*length;
-                    y -= Math.sin(Math.toRadians((data_gyroscope.Orein + resetOrien) ))*length;
+                    delta_x = Math.cos(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    delta_y = Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    x -= delta_x;
+                    y -= delta_y;
                     writePDR("GC_Less    :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
                     Last_Orein = data_gyroscope.Orein;
                     reset_count++;
+
+                    double now_orein = Last_Orein + resetOrien;
+                    last_distance = sg_distance;
+                    if (Math.abs(last_orien - now_orein) > 45) {
+                        sg_distance = 0;
+                    }
+                    else {
+                        sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
+                    }
+                    last_orien = Last_Orein;
                 }
                 else{
                     Last_Orein = data_gyroscope.Orein;
@@ -679,10 +728,21 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     bd.putInt("PathID",1);
                     ms.setData(bd);
                     UI_Handler.sendMessage(ms);
-                    x -= Math.cos(Math.toRadians((data_gyroscope.Orein + resetOrien)))*length;
-                    y -= Math.sin(Math.toRadians((data_gyroscope.Orein + resetOrien)))*length;
+                    delta_x = Math.cos(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    delta_y = Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
+                    x -= delta_x;
+                    y -= delta_y;
                     writePDR("GC_Normal:"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
 
+                    double now_orein = Last_Orein + resetOrien;
+                    last_distance = sg_distance;
+                    if (Math.abs(last_orien - now_orein) > 45) {
+                        sg_distance = 0;
+                    }
+                    else {
+                        sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
+                    }
+                    last_orien = Last_Orein;
                 }
                 ST += EachStepDT;
 
@@ -765,9 +825,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     bd.putInt("PathID",1);
                     ms.setData(bd);
                     UI_Handler.sendMessage(ms);
-                    x -= Math.cos(Math.toRadians(data_gyroscope.Orein + resetOrien))*length*(GlobalStepsList.getLast().Steps - CheckStepChange);
-                    y -= Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length*(GlobalStepsList.getLast().Steps - CheckStepChange);
 
+                    double delta_x, delta_y;
+                    delta_x = Math.cos(Math.toRadians(data_gyroscope.Orein + resetOrien))*length*(GlobalStepsList.getLast().Steps - CheckStepChange);
+                    delta_y = Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length*(GlobalStepsList.getLast().Steps - CheckStepChange);
+                    x -= delta_x;
+                    y -= delta_y;
+
+                    double now_orein = Last_Orein + resetOrien;
+                    last_distance = sg_distance;
+                    if (Math.abs(last_orien - now_orein) > 45) {
+                        sg_distance = 0;
+                    }
+                    else {
+                        sg_distance += Math.sqrt(Math.pow(delta_x, 2) + Math.pow(delta_y, 2));
+                    }
+                    last_orien = Last_Orein;
 
 //                    PDR_arrayList.add(new PDRinfo(GlobalStepsList.getLast().Steps - CheckStepChange,data_gyroscope.Orein));
 //                    freeDraw.addPath(GlobalStepsList.getLast().Steps - CheckStepChange, data_gyroscope.Orein,1);
@@ -3266,10 +3339,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void handleMessage(Message msg) {
             MainActivity theClass = outerClass.get();
             switch (msg.what){
-
                 case Constants.Handler.SensorEvent: {
 //                    theClass.checkOrein();
-
                     Bundle bundle = msg.getData();
 
                     theClass.freeDraw.addPath(bundle.getInt("Step"), bundle.getFloat("Orien"),bundle.getInt("PathID"));
@@ -3277,9 +3348,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double distance2 = Math.sqrt(Math.pow(theClass.x,2) + Math.pow((theClass.y-21),2));
                     theClass.TV_Step_Count.setText("Step Count:" + theClass.GlobalStepsList.getLast().Steps);
                     theClass.TV_Orien.setText("Orientation:" + (theClass.data_gyroscope.Orein + theClass.resetOrien));
-                    theClass.TV_Dest.setText("Distance to destination:" + theClass.mDecimalFormat.format(distance) + " m");
-
+                    theClass.TV_Dist.setText("Distance to destination:" + theClass.mDecimalFormat.format(distance) + " m");
                     theClass.TV_Start.setText("Distance to starting point:" + theClass.mDecimalFormat.format(distance2)  + " m");
+
+                    String last_dis = theClass.mDecimalFormat.format(theClass.last_distance);
+                    String sg_dis = theClass.mDecimalFormat.format(theClass.sg_distance);
+                    if (! last_dis.equals(sg_dis)) {
+                        String dataText = "orien: " + theClass.last_orien + ", distance: " + sg_dis + "\n";
+                        theClass.TV_pkData.setText(theClass.TV_pkData.getText() + dataText);
+                    }
 
                     break;
                 }
