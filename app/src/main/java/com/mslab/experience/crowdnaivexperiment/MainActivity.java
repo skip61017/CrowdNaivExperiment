@@ -355,12 +355,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private void saveSegment(double orien, double distance) {
         try {
-            if (last_distance != 0 && last_distance != sg_distance) {
+//            if (last_distance != 0 && last_distance != sg_distance) {
                 JSONObject sg = new JSONObject();
                 sg.put("direction", orien);
                 sg.put("distance", distance);
                 sgList.put(sg);
-            }
+//            }
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -704,7 +704,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
-                    last_orien = Last_Orein;
+//                    last_orien = Last_Orein;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
@@ -750,7 +750,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
-                        last_orien = Last_Orein;
+//                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
@@ -780,7 +780,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
-                        last_orien = Last_Orein;
+//                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
@@ -808,7 +808,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
-                        last_orien = Last_Orein;
+//                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
@@ -907,7 +907,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
                         saveSegment(last_orien, sg_distance);
-                        last_orien = Last_Orein;
+//                        last_orien = Last_Orein;
                         sg_distance = 0;
                     }
                     else {
