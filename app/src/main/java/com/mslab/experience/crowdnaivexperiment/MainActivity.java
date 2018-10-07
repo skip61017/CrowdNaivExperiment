@@ -298,6 +298,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         return super.onOptionsItemSelected(item);
     }
+
     private void findview(){
         TV_Step_Count = (TextView)findViewById(R.id.textView_Step_Count);
         TV_Orien = (TextView)findViewById(R.id.textView_Orientation);
@@ -312,6 +313,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //        TV_dest = (TextView)findViewById(R.id.textView_destination);
         editText_dest = (EditText)findViewById(R.id.editText_dest);
     }
+
+//    private void createPkData() {
+//
+//    }
+
     private void startSensor() {
         sensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
 
