@@ -337,6 +337,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         editText_dest = (EditText)findViewById(R.id.editText_dest);
     }
 
+    /********************** pkData creation ************************/
+
     private void createPkData() {
         try{
             pkData.put("user_id", getUserId());
@@ -374,6 +376,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         String uniqueId = uuid[0] + uuid[1] + uuid[2];
         return uniqueId.toUpperCase();
     }
+
+    /***************************************************************/
 
     private void startSensor() {
         sensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
