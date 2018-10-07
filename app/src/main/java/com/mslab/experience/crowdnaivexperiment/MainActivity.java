@@ -1,15 +1,19 @@
 package com.mslab.experience.crowdnaivexperiment;
 
+import android.app.Application;
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
+import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -40,8 +44,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener,OnClickListener{
 
@@ -217,7 +223,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             editText_dest.setEnabled(true);
                             saveSegment(last_orien, sg_distance);
                             createPkData();
-                            TV_pkData.setText(sgList + "\n");
+
+                            String[] pkDataDetail = (pkData + "\n").split(",");
+                            String dataText = "";
+                            for (int i = 0; i < pkDataDetail.length; i++) {
+                                dataText += pkDataDetail[i] + "\n";
+                            }
+                            TV_pkData.setText(dataText);
                         }
                         else{
                             pkData = new JSONObject();
@@ -327,8 +339,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private void createPkData() {
         try{
-            pkData.put("user_id", "12345678");
-            pkData.put("route_id", "123");
+            pkData.put("user_id", getUserId());
+            pkData.put("route_id", getRouteId());
             pkData.put("destination", dest);
             pkData.put("bpre", "bcon1");
             pkData.put("bcur", "bcon2");
@@ -348,6 +360,17 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         } catch (JSONException e) {
             e.printStackTrace();
         }
+    }
+
+    private String getUserId() {
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        return androidId.toUpperCase();
+    }
+
+    private String getRouteId() {
+        String[] uuid = UUID.randomUUID().toString().split("-");
+        String uniqueId = uuid[0] + uuid[1] + uuid[2];
+        return uniqueId.toUpperCase();
     }
 
     private void startSensor() {
