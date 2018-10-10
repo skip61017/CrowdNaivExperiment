@@ -464,8 +464,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void run() {
             try {
                 Thread.sleep(1000);
-//                URL url = new URL("http://163.13.127.174:9000/postTraj");
-                URL url = new URL("http://192.168.100.187:9000/postTraj");
+                URL url = new URL("http://163.13.127.174:9000/postTraj");
+//                URL url = new URL("http://192.168.100.187:9000/postTraj");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
