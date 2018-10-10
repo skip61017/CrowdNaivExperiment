@@ -67,45 +67,89 @@
                 android:text="7-11" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/layout_buttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/button_bcon1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="B1" />
+
+            <Button
+                android:id="@+id/button_bcon2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="B2" />
+
+            <Button
+                android:id="@+id/button_bcon3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="B3" />
+
+            <Button
+                android:id="@+id/button_done"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Done" />
+
+            <Button
+                android:id="@+id/button_show"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Show" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:id="@+id/layout_stepLen" >
+
+            <TextView
+                android:id="@+id/textView2"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Step length :" />
+
+            <EditText
+                android:id="@+id/editText"
+                android:layout_width="238dp"
+                android:layout_height="wrap_content"
+                android:ems="10"
+                android:hint="(m)"
+                android:inputType="numberDecimal"
+                android:text="0.7" />
+        </LinearLayout>
+
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="350dp">
+            android:layout_height="300dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/textView2"
-                        android:layout_width="100dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Step length :" />
-
-                    <EditText
-                        android:id="@+id/editText"
-                        android:layout_width="238dp"
-                        android:layout_height="wrap_content"
-                        android:ems="10"
-                        android:hint="(m)"
-                        android:inputType="numberDecimal"
-                        android:text="0.7" />
-                </LinearLayout>
-
                 <TextView
                     android:id="@+id/textView_PkData"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="TextView" />
+                    android:text="PkData: " />
 
                 <TextView
-                    android:id="@+id/textView_TempData"
+                    android:id="@+id/textView_Result"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 

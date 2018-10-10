@@ -33,11 +33,16 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.Calendar;
 import java.util.Collections;
@@ -176,9 +181,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     List<Data_Gyroscope> DataOfOrein =  Collections.synchronizedList(new LinkedList<Data_Gyroscope>());
     private boolean StartSensor;
     private float resetOrien = 0;
-    private TextView TV_Step_Count,TV_Start,TV_Orien,TV_Dist,TV_textview,TV_tempData,TV_dest,TV_pkData;
+    private TextView TV_Step_Count,TV_Start,TV_Orien,TV_Dist,TV_textview,TV_result,TV_dest,TV_pkData;
     private EditText editText, editText_dest;
-    private Button BT_Stat;
+    private Button BT_Stat,BT_bcon1, BT_bcon2,BT_bcon3,BT_done,BT_show;
+    private LinearLayout layout_btns, layout_len;
     private boolean StartAPP = false;
     private int reset_count = 0;
     private Data_Gyroscope data_gyroscope;
@@ -189,9 +195,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private double length = 0.7;
     
     private String dest;
+    private String bpre = "start";
+    private String bcur;
     private double last_orien = 90;
     private double sg_distance = 0;
     private double last_distance = 0;
+    private boolean status_show = true;
     private JSONObject pkData;
     private JSONArray sgList;
 
@@ -230,12 +239,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                                 dataText += pkDataDetail[i] + "\n";
                             }
                             TV_pkData.setText(dataText);
+                            layout_btns.setVisibility(View.GONE);
                         }
                         else{
                             pkData = new JSONObject();
                             sgList = new JSONArray();
                             BT_Stat.setText("Stop");
                             editText_dest.setEnabled(false);
+                            layout_btns.setVisibility(View.VISIBLE);
                         }
                         StartAPP = !StartAPP;
 
@@ -243,13 +254,48 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         sg_distance = 0;
                         last_distance = 0;
 
-                        TV_textview.setVisibility(View.GONE);
-                        editText.setVisibility(View.GONE);
+                        layout_len.setVisibility(View.GONE);
                         dest = editText_dest.getText().toString();
-                        TV_tempData.setText("Destination: " + dest);
+                        TV_result.setText("Destination: " + dest);
                     }
                 }, 1000);
+
+                break;
             }
+
+            case R.id.button_show:
+                if (status_show) {
+                    TV_result.setVisibility(View.GONE);
+                    TV_pkData.setVisibility(View.GONE);
+                }
+                else {
+                    TV_result.setVisibility(View.VISIBLE);
+                    TV_pkData.setVisibility(View.VISIBLE);
+                }
+                status_show = !status_show;
+                break;
+
+            case R.id.button_bcon1:
+                bcur = "bcon1";
+                TV_result.setText("You're now at " + bcur + ".");
+                break;
+
+            case R.id.button_bcon2:
+                bcur = "bcon2";
+                TV_result.setText("You're now at " + bcur + ".");
+                break;
+
+            case R.id.button_bcon3:
+                bcur = "bcon3";
+                TV_result.setText("You're now at " + bcur + ".");
+                break;
+
+            case R.id.button_done:
+                bcur = dest;
+                TV_result.setText("You're now at " + bcur + ".");
+                break;
+
+
         }
     }
 
@@ -331,13 +377,29 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         BT_Stat.setOnClickListener(this);
         TV_textview = (TextView)findViewById(R.id.textView2);
         editText = (EditText)findViewById(R.id.editText);
-        TV_tempData = (TextView)findViewById(R.id.textView_TempData);
+        TV_result = (TextView)findViewById(R.id.textView_Result);
         TV_pkData = (TextView)findViewById(R.id.textView_PkData);
 //        TV_dest = (TextView)findViewById(R.id.textView_destination);
         editText_dest = (EditText)findViewById(R.id.editText_dest);
+        BT_bcon1 = (Button)findViewById(R.id.button_bcon1);
+        BT_bcon2 = (Button)findViewById(R.id.button_bcon2);
+        BT_bcon3 = (Button)findViewById(R.id.button_bcon3);
+        BT_done = (Button)findViewById(R.id.button_done);
+        BT_show = (Button)findViewById(R.id.button_show);
+        BT_bcon1.setOnClickListener(this);
+        BT_bcon2.setOnClickListener(this);
+        BT_bcon3.setOnClickListener(this);
+        BT_done.setOnClickListener(this);
+        BT_show.setOnClickListener(this);
+        layout_btns = (LinearLayout)findViewById(R.id.layout_buttons);
+        layout_len = (LinearLayout)findViewById(R.id.layout_stepLen);
     }
 
-    /********************** pkData creation ************************/
+    /***************************************************************/
+    /*****************                            ******************/
+    /*****************    backend_data methods    ******************/
+    /*****************                            ******************/
+    /***************************************************************/
 
     private void createPkData() {
         try{
@@ -350,7 +412,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         } catch (JSONException e) {
             e.printStackTrace();
         }
-
     }
 
     private void saveSegment(double orien, double distance) {
@@ -375,6 +436,74 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         String[] uuid = UUID.randomUUID().toString().split("-");
         String uniqueId = uuid[0] + uuid[1] + uuid[2];
         return uniqueId.toUpperCase();
+    }
+
+    private Thread postThread = new Thread() {
+        @Override
+        public void run() {
+            try {
+                Thread.sleep(1000);
+                URL url = new URL("http://163.13.127.174:9000/postTraj");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
+                conn.setRequestProperty("Content-Type", "application/json");
+                byte[] data = pkData.toString().getBytes();
+                conn.setRequestProperty("Content-length", String.valueOf(data.length));
+                conn.getOutputStream().write(data);
+
+                int code = conn.getResponseCode();
+                if (code == 200) {
+                    InputStream is = conn.getInputStream();
+                    BufferedReader br = new BufferedReader(new InputStreamReader(is));
+                    StringBuffer sb = new StringBuffer();
+                    String len = null;
+
+                    while ((len = br.readLine()) != null) {
+                        sb.append(len);
+                    }
+
+                    String result = sb.toString();
+
+                    runToastInAnyThread(result);
+                }
+                else if (code == 500) {
+                    TV_result.setText("Cannot connect to server.");
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    };
+
+    private void runToastInAnyThread(final String result) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                JSONObject jsonObject;
+                JSONArray naviArray;
+                String status, naviResult = "";
+                try {
+                    jsonObject = new JSONObject(result);
+                    status = jsonObject.get("status").toString();
+                    naviArray = jsonObject.getJSONArray("navi");
+                    for (int i = 0; i < naviArray.length(); i++) {
+                        JSONArray sgList = naviArray.getJSONArray(i);
+                        naviResult += "Step" + i + ":\n";
+                        for (int j = 0; j < sgList.length(); j++) {
+                            JSONObject sg = sgList.getJSONObject(j);
+                            naviResult += sg + "\n";
+                        }
+                    }
+
+                    TV_result.setText(naviResult);
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
     }
 
     /***************************************************************/
@@ -3427,7 +3556,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     String sg_dis = theClass.mDecimalFormat.format(theClass.sg_distance);
                     if (! last_dis.equals(sg_dis)) {
                         String dataText = "orien: " + theClass.last_orien + ", distance: " + sg_dis + "\n";
-                        theClass.TV_tempData.setText(theClass.TV_tempData.getText() + dataText);
+                        theClass.TV_result.setText(theClass.TV_result.getText() + dataText);
                     }
 
                     break;
