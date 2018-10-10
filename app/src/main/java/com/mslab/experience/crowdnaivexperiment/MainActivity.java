@@ -275,6 +275,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_bcon1:
                 bpre = bcur;
                 bcur = "bcon1";
+                saveSegment(last_orien, sg_distance);
+                last_orien = Last_Orein;
+                sg_distance = 0;
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
@@ -283,6 +286,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_bcon2:
                 bpre = bcur;
                 bcur = "bcon2";
+                saveSegment(last_orien, sg_distance);
+                last_orien = Last_Orein;
+                sg_distance = 0;
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
@@ -291,6 +297,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_bcon3:
                 bpre = bcur;
                 bcur = "bcon3";
+                saveSegment(last_orien, sg_distance);
+                last_orien = Last_Orein;
+                sg_distance = 0;
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
@@ -300,6 +309,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_done:
                 bpre = bcur;
                 bcur = dest;
+                saveSegment(last_orien, sg_distance);
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
