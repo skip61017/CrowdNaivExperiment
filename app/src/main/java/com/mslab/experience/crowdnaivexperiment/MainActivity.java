@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 import android.provider.Settings;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
@@ -195,8 +196,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private double length = 0.7;
     
     private String dest;
+    private String route_id;
     private String bpre = "start";
-    private String bcur;
+    private String bcur = "start";
     private double last_orien = 90;
     private double sg_distance = 0;
     private double last_distance = 0;
@@ -232,18 +234,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             editText_dest.setEnabled(true);
                             saveSegment(last_orien, sg_distance);
                             createPkData();
-
-                            String[] pkDataDetail = (pkData + "\n").split(",");
-                            String dataText = "";
-                            for (int i = 0; i < pkDataDetail.length; i++) {
-                                dataText += pkDataDetail[i] + "\n";
-                            }
-                            TV_pkData.setText(dataText);
+                            showDetailOfPkData();
                             layout_btns.setVisibility(View.GONE);
                         }
                         else{
                             pkData = new JSONObject();
                             sgList = new JSONArray();
+                            route_id = getRouteId();
                             BT_Stat.setText("Stop");
                             editText_dest.setEnabled(false);
                             layout_btns.setVisibility(View.VISIBLE);
@@ -276,22 +273,35 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 break;
 
             case R.id.button_bcon1:
+                bpre = bcur;
                 bcur = "bcon1";
+                createPkData();
+                showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
                 break;
 
             case R.id.button_bcon2:
+                bpre = bcur;
                 bcur = "bcon2";
+                createPkData();
+                showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
                 break;
 
             case R.id.button_bcon3:
+                bpre = bcur;
                 bcur = "bcon3";
+                createPkData();
+                showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
+                postThread.start();
                 break;
 
             case R.id.button_done:
+                bpre = bcur;
                 bcur = dest;
+                createPkData();
+                showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
                 break;
 
@@ -404,14 +414,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private void createPkData() {
         try{
             pkData.put("user_id", getUserId());
-            pkData.put("route_id", getRouteId());
+            pkData.put("route_id", route_id);
             pkData.put("destination", dest);
-            pkData.put("bpre", "bcon1");
-            pkData.put("bcur", "bcon2");
+            pkData.put("bpre", bpre);
+            pkData.put("bcur", bcur);
             pkData.put("sgList", sgList);
         } catch (JSONException e) {
             e.printStackTrace();
         }
+    }
+
+    private void showDetailOfPkData() {
+        String[] pkDataDetail = (pkData + "\n").split(",");
+        String dataText = "";
+        for (int i = 0; i < pkDataDetail.length; i++) {
+            dataText += pkDataDetail[i] + "\n";
+        }
+        TV_pkData.setText(dataText);
     }
 
     private void saveSegment(double orien, double distance) {
@@ -427,11 +446,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
+    @NonNull
     private String getUserId() {
         String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
         return androidId.toUpperCase();
     }
 
+    @NonNull
     private String getRouteId() {
         String[] uuid = UUID.randomUUID().toString().split("-");
         String uniqueId = uuid[0] + uuid[1] + uuid[2];
@@ -443,7 +464,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void run() {
             try {
                 Thread.sleep(1000);
-                URL url = new URL("http://163.13.127.174:9000/postTraj");
+//                URL url = new URL("http://163.13.127.174:9000/postTraj");
+                URL url = new URL("http://192.168.100.187:9000/postTraj");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
@@ -466,37 +488,43 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                     String result = sb.toString();
 
-                    runToastInAnyThread(result);
+                    setResultInAnyThread(result);
                 }
-                else if (code == 500) {
-                    TV_result.setText("Cannot connect to server.");
+                else {
+                    TV_result.setText("Connecting failed.");
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+//                String errText = e.getMessage();
+//                Log.d("ThreadErrorLog", errText);
             }
         }
     };
 
-    private void runToastInAnyThread(final String result) {
+    private void setResultInAnyThread(final String result) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 JSONObject jsonObject;
                 JSONArray naviArray;
-                String status, naviResult = "";
+                String status, navi, naviResult = "";
                 try {
                     jsonObject = new JSONObject(result);
                     status = jsonObject.get("status").toString();
-                    naviArray = jsonObject.getJSONArray("navi");
-                    for (int i = 0; i < naviArray.length(); i++) {
-                        JSONArray sgList = naviArray.getJSONArray(i);
-                        naviResult += "Step" + i + ":\n";
-                        for (int j = 0; j < sgList.length(); j++) {
-                            JSONObject sg = sgList.getJSONObject(j);
-                            naviResult += sg + "\n";
+                    navi = jsonObject.get("navi").toString();
+                    if (navi != "null") {
+                        naviArray = jsonObject.getJSONArray("navi");
+                        for (int i = 0; i < naviArray.length(); i++) {
+                            JSONArray sgList = naviArray.getJSONArray(i);
+                            naviResult += "Step" + i + ":\n";
+                            for (int j = 0; j < sgList.length(); j++) {
+                                JSONObject sg = sgList.getJSONObject(j);
+                                naviResult += sg + "\n";
+                            }
                         }
                     }
-
+                    Toast toast = Toast.makeText(getApplicationContext(), status, Toast.LENGTH_SHORT);
+                    toast.show();
                     TV_result.setText(naviResult);
 
                 } catch (JSONException e) {
