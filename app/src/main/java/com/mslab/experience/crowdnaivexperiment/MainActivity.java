@@ -239,7 +239,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         }
                         else{
                             pkData = new JSONObject();
-                            sgList = new JSONArray();
                             route_id = getRouteId();
                             BT_Stat.setText("Stop");
                             editText_dest.setEnabled(false);
@@ -281,6 +280,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
+                Thread postThread = new Thread(startPost);
+                postThread.start();
                 break;
 
             case R.id.button_bcon2:
@@ -292,6 +293,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
+                Thread postThread2 = new Thread(startPost);
+                postThread2.start();
                 break;
 
             case R.id.button_bcon3:
@@ -303,7 +306,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
-                postThread.start();
+                Thread postThread3 = new Thread(startPost);
+                postThread3.start();
                 break;
 
             case R.id.button_done:
@@ -313,6 +317,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
+                Thread postThread4 = new Thread(startPost);
+                postThread4.start();
                 break;
 
 
@@ -429,6 +435,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             pkData.put("bpre", bpre);
             pkData.put("bcur", bcur);
             pkData.put("sgList", sgList);
+            sgList = new JSONArray();
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -469,7 +476,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         return uniqueId.toUpperCase();
     }
 
-    private Thread postThread = new Thread() {
+//    private Thread postThread = new Thread() {
+    private Runnable startPost = new Runnable() {
         @Override
         public void run() {
             try {
@@ -505,8 +513,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-//                String errText = e.getMessage();
-//                Log.d("ThreadErrorLog", errText);
+                String errText = e.getMessage();
+                Log.d("ThreadErrorLog", errText);
             }
         }
     };
@@ -522,7 +530,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     jsonObject = new JSONObject(result);
                     status = jsonObject.get("status").toString();
                     navi = jsonObject.get("navi").toString();
-                    if (navi != "null") {
+                    if (navi == "Done") {
+                        naviResult = "Arrived.";
+                    }
+                    else if (navi != "null") {
                         naviArray = jsonObject.getJSONArray("navi");
                         for (int i = 0; i < naviArray.length(); i++) {
                             JSONArray sgList = naviArray.getJSONArray(i);
@@ -533,6 +544,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             }
                         }
                     }
+                    else {
+                        naviResult = "Just Walk Ahead.";
+                    }
+
                     Toast toast = Toast.makeText(getApplicationContext(), status, Toast.LENGTH_SHORT);
                     toast.show();
                     TV_result.setText(naviResult);
