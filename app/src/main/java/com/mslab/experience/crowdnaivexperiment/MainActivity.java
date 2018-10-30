@@ -1,17 +1,26 @@
 package com.mslab.experience.crowdnaivexperiment;
 
+import android.Manifest;
+import android.app.Activity;
 import android.app.Application;
+import android.bluetooth.BluetoothAdapter;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.os.Message;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
@@ -23,11 +32,16 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.hereapps.ibeacon.IBeacon;
+import com.hereapps.ibeacon.IBeaconLibrary;
+import com.hereapps.ibeacon.IBeaconListener;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -45,8 +59,11 @@ import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -186,7 +203,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private EditText editText, editText_dest;
     private Button BT_Stat,BT_bcon1, BT_bcon2,BT_bcon3,BT_done,BT_show;
     private LinearLayout layout_btns, layout_len;
-    private boolean StartAPP = false;
+    private boolean StartAPP = true;
     private int reset_count = 0;
     private Data_Gyroscope data_gyroscope;
     private Handler mHandler;
@@ -194,7 +211,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private double x = 0;
     private double y = 21;
     private double length = 0.7;
-    
+
+    private final int REQUEST_ENABLE_BT = 0xa01;
+    private final int PERMISSION_REQUEST_COARSE_LOCATION = 0xb01;
+
+    private static ArrayList<IBeacon> iBeacons;
+    private IBeaconLibrary iBeaconLibrary;
+    private static BluetoothAdapter mBtAdapter;
+    private IBeacon prev_beacon = null;
+
     private String dest;
     private String route_id;
     private String bpre = "start";
@@ -202,6 +227,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private double last_orien = 90;
     private double sg_distance = 0;
     private double last_distance = 0;
+    private double enter_bcon_point = 0;
+    private double exit_bcon_point = 0;
     private boolean status_show = true;
     private JSONObject pkData;
     private JSONArray sgList;
@@ -229,13 +256,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     @Override
                     public void run() {
 //                        TipHelper.PlaySound(getBaseContext());
+                        StartAPP = !StartAPP;
                         if(StartAPP){
                             BT_Stat.setText("Start");
                             editText_dest.setEnabled(true);
-                            saveSegment(last_orien, sg_distance);
+                            saveSegment();
                             createPkData();
                             showDetailOfPkData();
                             layout_btns.setVisibility(View.GONE);
+                            serviceBinder.stopScan();
                         }
                         else{
                             pkData = new JSONObject();
@@ -244,8 +273,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             BT_Stat.setText("Stop");
                             editText_dest.setEnabled(false);
                             layout_btns.setVisibility(View.VISIBLE);
+                            serviceBinder.startScan();
                         }
-                        StartAPP = !StartAPP;
+
 
                         length = Double.valueOf(editText.getText().toString());
                         sg_distance = 0;
@@ -275,7 +305,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_bcon1:
                 bpre = bcur;
                 bcur = "bcon1";
-                saveSegment(last_orien, sg_distance);
+                saveSegment();
                 last_orien = Last_Orein;
                 sg_distance = 0;
                 createPkData();
@@ -286,7 +316,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_bcon2:
                 bpre = bcur;
                 bcur = "bcon2";
-                saveSegment(last_orien, sg_distance);
+                saveSegment();
                 last_orien = Last_Orein;
                 sg_distance = 0;
                 createPkData();
@@ -297,19 +327,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_bcon3:
                 bpre = bcur;
                 bcur = "bcon3";
-                saveSegment(last_orien, sg_distance);
+                saveSegment();
                 last_orien = Last_Orein;
                 sg_distance = 0;
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
+                Thread postThread = new Thread(startPost);
                 postThread.start();
                 break;
 
             case R.id.button_done:
                 bpre = bcur;
                 bcur = dest;
-                saveSegment(last_orien, sg_distance);
+                saveSegment();
                 createPkData();
                 showDetailOfPkData();
                 TV_result.setText("You're now at " + bcur + ".");
@@ -329,13 +360,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             this.timestamp = timestamps;
         }
     }
+
     LinkedList<PDRinfo> PDR_arrayList = new LinkedList<>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+
+            if (this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
+            }
+        }
 
         UI_Handler = new MHandler(this);
         LinearLayout freeDrawLayout = (LinearLayout) findViewById(R.id.drawLayout);
@@ -351,6 +391,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(!myDir.exists())
             myDir.mkdirs();
         mDecimalFormat = new DecimalFormat("#.##");
+
+        if(iBeacons == null)
+            iBeacons = new ArrayList<IBeacon>();
+        Intent bindIntent = new Intent(this,BLEService.class);
+        bindService(bindIntent, connection, BIND_AUTO_CREATE);
+        init();
     }
 
     @Override
@@ -358,12 +404,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onResume();
         mHandler = new Handler();
         startSensor();
+        iBeaconLibrary.startScan();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         stopSensor();
+        iBeaconLibrary.stopScan();
     }
 
     @Override
@@ -417,7 +465,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     /***************************************************************/
     /*****************                            ******************/
-    /*****************    backend_data methods    ******************/
+    /*****************       create pkdata        ******************/
     /*****************                            ******************/
     /***************************************************************/
 
@@ -429,6 +477,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             pkData.put("bpre", bpre);
             pkData.put("bcur", bcur);
             pkData.put("sgList", sgList);
+            sgList = new JSONArray();
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -443,12 +492,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         TV_pkData.setText(dataText);
     }
 
-    private void saveSegment(double orien, double distance) {
+    private void saveSegment() {
         try {
             if (last_distance != 0 && last_distance != sg_distance) {
                 JSONObject sg = new JSONObject();
-                sg.put("direction", orien);
-                sg.put("distance", distance);
+                sg.put("direction", last_orien);
+                sg.put("distance", sg_distance);
                 sgList.put(sg);
             }
         } catch (JSONException e) {
@@ -469,7 +518,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         return uniqueId.toUpperCase();
     }
 
-    private Thread postThread = new Thread() {
+    /***************************************************************/
+    /*****************                            ******************/
+    /*****************         post thread        ******************/
+    /*****************                            ******************/
+    /***************************************************************/
+
+//    private Thread postThread = new Thread() {
+    private Runnable startPost = new Runnable() {
+
         @Override
         public void run() {
             try {
@@ -544,6 +601,141 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         });
     }
 
+    /***************************************************************/
+    /*****************                            ******************/
+    /*****************    bluetooth & ibeacon     ******************/
+    /*****************                            ******************/
+    /***************************************************************/
+
+    private void init() {
+        mBtAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (mBtAdapter == null) {
+            Log.d("BluetoothEnable", "Cannot support bluetooth service.");
+            return;
+        }
+
+        if (!mBtAdapter.isEnabled()) {
+            Log.d("BluetoothEnable", "Please turn on bluetooth.");
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+        }
+        else {
+            Log.d("BluetoothEnable", "Bluetooth is already on.");
+        }
+        iBeaconLibrary.setBluetoothAdapter(this);
+    }
+
+    private BLEService.MyBinder serviceBinder;
+    private ServiceConnection connection = new ServiceConnection() {
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.d("BeaconDetect", "Service disconnected");
+        }
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.d("BeaconDetect", "Service connected");
+            Log.e("felix", "onServiceConnected:");
+            serviceBinder = (BLEService.MyBinder) service;
+            serviceBinder.setListener(iBeaconListener);
+
+        }
+    };
+
+    private String getBeaconID(IBeacon iBeacon) {
+        String[] beacon_uuid = iBeacon.getUuidHexStringDashed().split("-");
+        return beacon_uuid[0] + iBeacon.getMajor() + iBeacon.getMinor();
+    }
+
+    private IBeaconListener iBeaconListener = new IBeaconListener() {
+        @Override
+        public void beaconEnter(IBeacon iBeacon) {
+            Toast toast = Toast.makeText(MainActivity.this, "Enter beacon!", Toast.LENGTH_SHORT);
+            toast.show();
+
+            if (prev_beacon.equals(iBeacon))
+                return;
+
+            enter_bcon_point = sg_distance;
+        }
+
+        @Override
+        public void beaconExit(IBeacon iBeacon) {
+            Toast toast = Toast.makeText(MainActivity.this, "Exit beacon!", Toast.LENGTH_SHORT);
+            toast.show();
+
+            if (prev_beacon.equals(iBeacon))
+                return;
+
+            exit_bcon_point = sg_distance;
+            double diff = (exit_bcon_point - enter_bcon_point) / 2;
+            sg_distance = enter_bcon_point + diff;
+            bpre = bcur;
+            bcur = getBeaconID(iBeacon);
+            saveSegment();
+            last_orien = Last_Orein;
+            sg_distance = diff;
+            createPkData();
+            showDetailOfPkData();
+
+            prev_beacon = iBeacon;
+        }
+
+        @Override
+        public void beaconFound(IBeacon iBeacon) {
+            Toast toast = Toast.makeText(MainActivity.this, "Found beacon!", Toast.LENGTH_SHORT);
+            toast.show();
+            if (prev_beacon.equals(iBeacon))
+                return;
+            iBeacons.add(iBeacon);
+            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm:ss");
+            Date date = new Date(System.currentTimeMillis());
+            String text = simpleDateFormat.format(date) + "\n"
+                    + "prev_beacon: " + prev_beacon.toString() + "\n"
+                    + "now_beacon" + iBeacon.toString() + "\n";
+            TV_result.setText(TV_result.getText() + text);
+
+        }
+
+        @Override
+        public void scanState(int state) {
+            if (!StartAPP || state == IBeaconLibrary.SCAN_END_EMPTY || state == IBeaconLibrary.SCAN_END_SUCCESS) {
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        serviceBinder.startScan();
+                    }
+                },1000);
+            }
+        }
+
+        @Override
+        public void operationError(int status) {
+            Log.i(IBeaconLibrary.LOG_TAG, "Bluetooth error: " + status);
+        }
+    };
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSION_REQUEST_COARSE_LOCATION:
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                }
+                break;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_ENABLE_BT) {
+            if (resultCode == Activity.RESULT_OK) {
+//                scanBeacons();
+            }
+        }
+    }
+
+    /***************************************************************/
     /***************************************************************/
 
     private void startSensor() {
@@ -873,7 +1065,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     last_orien = Last_Orein;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment(last_orien, sg_distance);
+                        saveSegment();
                         sg_distance = 0;
                     }
                     else {
@@ -916,7 +1108,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment(last_orien, sg_distance);
+                        saveSegment();
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -946,7 +1138,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment(last_orien, sg_distance);
+                        saveSegment();
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -974,7 +1166,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment(last_orien, sg_distance);
+                        saveSegment();
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -1073,7 +1265,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment(last_orien, sg_distance);
+                        saveSegment();
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -1131,6 +1323,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void run() {
             try {
                 while(true) {
+//                    scanBeacons();
                     synchronized (mPauseLock) {
                         while (data_sensorList.size() == 0) {
                             mPauseLock.wait();
@@ -3594,7 +3787,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     String sg_dis = theClass.mDecimalFormat.format(theClass.sg_distance);
                     if (! last_dis.equals(sg_dis)) {
                         String dataText = "orien: " + theClass.last_orien + ", distance: " + sg_dis + "\n";
-                        theClass.TV_result.setText(theClass.TV_result.getText() + dataText);
+//                        theClass.TV_result.setText(theClass.TV_result.getText() + dataText);
                     }
 
                     break;
