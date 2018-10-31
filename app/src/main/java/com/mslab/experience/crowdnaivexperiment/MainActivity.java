@@ -179,8 +179,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float AllInZ=90;
     private long TimeStamp_Gravity;
     private float[] Value_Gravity;
-    private Handler Sensor_Handler;
-    private HandlerThread Sensor_Thread;
+    private Handler Sensor_Handler, Scanning_Handler;
+    private HandlerThread Sensor_Thread, Scanning_Thread;
     private long TimeStamp_Gyroscope;
     private float[] Last_Gyro;
     private float StartTime_Gyro;
@@ -264,7 +264,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             createPkData();
                             showDetailOfPkData();
                             layout_btns.setVisibility(View.GONE);
-                            serviceBinder.stopScan();
+                            stopScanning();
                         }
                         else{
                             pkData = new JSONObject();
@@ -273,7 +273,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             BT_Stat.setText("Stop");
                             editText_dest.setEnabled(false);
                             layout_btns.setVisibility(View.VISIBLE);
-                            serviceBinder.startScan();
+                            startScanning();
                         }
 
 
@@ -394,8 +394,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         if(iBeacons == null)
             iBeacons = new ArrayList<IBeacon>();
-        Intent bindIntent = new Intent(this,BLEService.class);
-        bindService(bindIntent, connection, BIND_AUTO_CREATE);
+//        Intent bindIntent = new Intent(this,BLEService.class);
+//        bindService(bindIntent, connection, BIND_AUTO_CREATE);
         init();
     }
 
@@ -622,31 +622,40 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         else {
             Log.d("BluetoothEnable", "Bluetooth is already on.");
         }
+        iBeaconLibrary = IBeaconLibrary.getInstance();
+        iBeaconLibrary.setListener(iBeaconListener);
         iBeaconLibrary.setBluetoothAdapter(this);
     }
-
-    private BLEService.MyBinder serviceBinder;
-    private ServiceConnection connection = new ServiceConnection() {
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            Log.d("BeaconDetect", "Service disconnected");
-        }
-
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            Log.d("BeaconDetect", "Service connected");
-            Log.e("felix", "onServiceConnected:");
-            serviceBinder = (BLEService.MyBinder) service;
-            serviceBinder.setListener(iBeaconListener);
-
-        }
-    };
 
     private String getBeaconID(IBeacon iBeacon) {
         String[] beacon_uuid = iBeacon.getUuidHexStringDashed().split("-");
         return beacon_uuid[0] + iBeacon.getMajor() + iBeacon.getMinor();
     }
+
+    private void startScanning() {
+        Scanning_Thread = new HandlerThread("SensorData");
+        Scanning_Thread.start();
+        Scanning_Handler = new Handler(Scanning_Thread.getLooper());
+
+    }
+
+    private void stopScanning() {
+        if (Scanning_Handler != null) {
+            Scanning_Handler.removeCallbacks(run_scanning);
+            iBeaconLibrary.stopScan();
+        }
+        if (Scanning_Thread != null) {
+            Scanning_Thread.quit();
+        }
+
+    }
+
+    private Runnable run_scanning = new Runnable() {
+        @Override
+        public void run() {
+            iBeaconLibrary.startScan();
+        }
+    };
 
     private IBeaconListener iBeaconListener = new IBeaconListener() {
         @Override
@@ -704,7 +713,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 new Handler().postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        serviceBinder.startScan();
+                        startScanning();
                     }
                 },1000);
             }
@@ -715,6 +724,28 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             Log.i(IBeaconLibrary.LOG_TAG, "Bluetooth error: " + status);
         }
     };
+
+//    private BLEService.MyBinder serviceBinder;
+//    private ServiceConnection connection = new ServiceConnection() {
+//
+//        @Override
+//        public void onServiceDisconnected(ComponentName name) {
+//            Log.d("BeaconDetect", "Service disconnected");
+//        }
+//
+//        @Override
+//        public void onServiceConnected(ComponentName name, IBinder service) {
+//            Log.d("BeaconDetect", "Service connected");
+//            Log.e("felix", "onServiceConnected:");
+//            serviceBinder = (BLEService.MyBinder) service;
+//            serviceBinder.setListener(iBeaconListener);
+//            serviceBinder.startScan();
+//
+//        }
+//    };
+
+    /***************************************************************/
+    /***************************************************************/
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -734,9 +765,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
         }
     }
-
-    /***************************************************************/
-    /***************************************************************/
 
     private void startSensor() {
         sensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
@@ -786,6 +814,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             if(!StartSensor){
                 StartSensor = true;
                 Sensor_Handler.post(Run_Sensor);
+                Scanning_Handler.post(run_scanning);
             }
             Data_3_AXIS data_sensor = new Data_3_AXIS(event.sensor.getType(),event.values.clone(),event.timestamp);
             synchronized (mPauseLock) {
