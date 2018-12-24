@@ -1,26 +1,17 @@
 package com.mslab.experience.crowdnaivexperiment;
 
-import android.Manifest;
-import android.app.Activity;
 import android.app.Application;
-import android.bluetooth.BluetoothAdapter;
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.IBinder;
 import android.os.Message;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
@@ -32,16 +23,12 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import com.hereapps.ibeacon.IBeacon;
-import com.hereapps.ibeacon.IBeaconLibrary;
-import com.hereapps.ibeacon.IBeaconListener;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -59,11 +46,8 @@ import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -72,7 +56,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener,OnClickListener{
+public class MainActivity extends AppCompatActivity implements SensorEventListener,OnClickListener, RadioGroup.OnCheckedChangeListener {
 
     protected MoveAndDraw freeDraw;
     public static MHandler UI_Handler;
@@ -179,8 +163,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float AllInZ=90;
     private long TimeStamp_Gravity;
     private float[] Value_Gravity;
-    private Handler Sensor_Handler, Scanning_Handler;
-    private HandlerThread Sensor_Thread, Scanning_Thread;
+    private Handler Sensor_Handler;
+    private HandlerThread Sensor_Thread;
     private long TimeStamp_Gyroscope;
     private float[] Last_Gyro;
     private float StartTime_Gyro;
@@ -199,26 +183,26 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     List<Data_Gyroscope> DataOfOrein =  Collections.synchronizedList(new LinkedList<Data_Gyroscope>());
     private boolean StartSensor;
     private float resetOrien = 0;
-    private TextView TV_Step_Count,TV_Start,TV_Orien,TV_Dist,TV_textview,TV_result,TV_dest,TV_pkData;
+    private TextView TV_Step_Count,TV_Start,TV_Orien,TV_Dist,TV_step,TV_navi,TV_pkData;
     private EditText editText, editText_dest;
-    private Button BT_Stat,BT_bcon1, BT_bcon2,BT_bcon3,BT_done,BT_show;
-    private LinearLayout layout_btns, layout_len;
-    private boolean StartAPP = true;
+    private Button BT_Stat;
+    private Button BT_bcon1, BT_bcon2,BT_bcon3,BT_done,BT_show;
+    private RadioGroup radioGroup;
+    private LinearLayout freeDrawLayout;
+    private LinearLayout layout_len;
+    private LinearLayout layout_btns;
+    private boolean StartAPP = false;
     private int reset_count = 0;
     private Data_Gyroscope data_gyroscope;
     private Handler mHandler;
 
+    private static int Default = 0;
+    private static int IsArrived = 1;
+    private static int IsCanceled = 2;
+
     private double x = 0;
     private double y = 21;
     private double length = 0.7;
-
-    private final int REQUEST_ENABLE_BT = 0xa01;
-    private final int PERMISSION_REQUEST_COARSE_LOCATION = 0xb01;
-
-    private static ArrayList<IBeacon> iBeacons;
-    private IBeaconLibrary iBeaconLibrary;
-    private static BluetoothAdapter mBtAdapter;
-    private IBeacon prev_beacon = null;
 
     private String dest;
     private String route_id;
@@ -227,10 +211,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private double last_orien = 90;
     private double sg_distance = 0;
     private double last_distance = 0;
-    private double enter_bcon_point = 0;
-    private double exit_bcon_point = 0;
     private boolean status_show = true;
-    private JSONObject pkData;
+    private JSONObject jsonData, pkData;
     private JSONArray sgList;
 
     private Calendar CalendarForDir = Calendar.getInstance();
@@ -244,7 +226,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     File myDir;
 
     File File_PDR;
-    DecimalFormat mDecimalFormat;
     private static final float THESHOLD_TURN=3;
     private static final double THESHOLD_CHECK_PHONE_POSE = 7;
 
@@ -256,26 +237,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     @Override
                     public void run() {
 //                        TipHelper.PlaySound(getBaseContext());
-                        StartAPP = !StartAPP;
                         if(StartAPP){
                             BT_Stat.setText("Start");
                             editText_dest.setEnabled(true);
-                            saveSegment();
-                            createPkData();
+                            saveSegment(last_orien, sg_distance);
+                            createJsonData(IsCanceled);
                             showDetailOfPkData();
                             layout_btns.setVisibility(View.GONE);
-                            stopScanning();
                         }
                         else{
+                            jsonData = new JSONObject();
                             pkData = new JSONObject();
                             sgList = new JSONArray();
                             route_id = getRouteId();
                             BT_Stat.setText("Stop");
                             editText_dest.setEnabled(false);
                             layout_btns.setVisibility(View.VISIBLE);
-                            startScanning();
                         }
-
+                        StartAPP = !StartAPP;
 
                         length = Double.valueOf(editText.getText().toString());
                         sg_distance = 0;
@@ -283,7 +262,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                         layout_len.setVisibility(View.GONE);
                         dest = editText_dest.getText().toString();
-                        TV_result.setText("Destination: " + dest);
+                        TV_step.setText("Destination: " + dest + "\n");
                     }
                 }, 1000);
 
@@ -292,11 +271,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             case R.id.button_show:
                 if (status_show) {
-                    TV_result.setVisibility(View.GONE);
+                    TV_navi.setVisibility(View.GONE);
                     TV_pkData.setVisibility(View.GONE);
                 }
                 else {
-                    TV_result.setVisibility(View.VISIBLE);
+                    TV_step.setVisibility(View.VISIBLE);
                     TV_pkData.setVisibility(View.VISIBLE);
                 }
                 status_show = !status_show;
@@ -305,50 +284,82 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case R.id.button_bcon1:
                 bpre = bcur;
                 bcur = "bcon1";
-                saveSegment();
+                saveSegment(last_orien, sg_distance);
                 last_orien = Last_Orein;
                 sg_distance = 0;
-                createPkData();
+                createJsonData(Default);
                 showDetailOfPkData();
-                TV_result.setText("You're now at " + bcur + ".");
+                TV_step.setText("You're now at " + bcur + ".");
                 break;
 
             case R.id.button_bcon2:
                 bpre = bcur;
                 bcur = "bcon2";
-                saveSegment();
+                saveSegment(last_orien, sg_distance);
                 last_orien = Last_Orein;
                 sg_distance = 0;
-                createPkData();
+                createJsonData(Default);
                 showDetailOfPkData();
-                TV_result.setText("You're now at " + bcur + ".");
+                TV_step.setText("You're now at " + bcur + ".");
                 break;
 
             case R.id.button_bcon3:
                 bpre = bcur;
                 bcur = "bcon3";
-                saveSegment();
+                saveSegment(last_orien, sg_distance);
                 last_orien = Last_Orein;
                 sg_distance = 0;
-                createPkData();
+                createJsonData(Default);
                 showDetailOfPkData();
-                TV_result.setText("You're now at " + bcur + ".");
-                Thread postThread = new Thread(startPost);
+                TV_step.setText("You're now at " + bcur + ".");
                 postThread.start();
                 break;
 
             case R.id.button_done:
                 bpre = bcur;
                 bcur = dest;
-                saveSegment();
-                createPkData();
+                saveSegment(last_orien, sg_distance);
+                createJsonData(IsArrived);
                 showDetailOfPkData();
-                TV_result.setText("You're now at " + bcur + ".");
+                TV_step.setText("You're now at " + bcur + ".");
+                break;
+        }
+    }
+
+    @Override
+    public void onCheckedChanged(RadioGroup radioGroup, int checkId) {
+        switch (checkId) {
+            case R.id.rButton_step:
+                TV_step.setVisibility(View.VISIBLE);
+                TV_pkData.setVisibility(View.GONE);
+                TV_navi.setVisibility(View.GONE);
+                freeDrawLayout.setVisibility(View.GONE);
                 break;
 
+            case R.id.rButton_pkData:
+                TV_step.setVisibility(View.GONE);
+                TV_pkData.setVisibility(View.VISIBLE);
+                TV_navi.setVisibility(View.GONE);
+                freeDrawLayout.setVisibility(View.GONE);
+                break;
+
+            case R.id.rButton_navi:
+                TV_step.setVisibility(View.GONE);
+                TV_pkData.setVisibility(View.GONE);
+                TV_navi.setVisibility(View.VISIBLE);
+                freeDrawLayout.setVisibility(View.GONE);
+                break;
+
+            case R.id.rButton_draw:
+                TV_step.setVisibility(View.GONE);
+                TV_pkData.setVisibility(View.GONE);
+                TV_navi.setVisibility(View.GONE);
+                freeDrawLayout.setVisibility(View.VISIBLE);
+                break;
 
         }
     }
+
 
     class Data_3_AXIS {
         public int types;
@@ -360,9 +371,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             this.timestamp = timestamps;
         }
     }
-
     LinkedList<PDRinfo> PDR_arrayList = new LinkedList<>();
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -370,15 +379,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-
-            if (this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
-            }
-        }
-
         UI_Handler = new MHandler(this);
-        LinearLayout freeDrawLayout = (LinearLayout) findViewById(R.id.drawLayout);
+        freeDrawLayout = (LinearLayout) findViewById(R.id.drawLayout);
         freeDraw = new MoveAndDraw(MainActivity.this);
         freeDrawLayout.addView(freeDraw);
         findview();
@@ -390,13 +392,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         File_PDR = new File(myDir,"PDR.txt");
         if(!myDir.exists())
             myDir.mkdirs();
-        mDecimalFormat = new DecimalFormat("#.##");
-
-        if(iBeacons == null)
-            iBeacons = new ArrayList<IBeacon>();
-//        Intent bindIntent = new Intent(this,BLEService.class);
-//        bindService(bindIntent, connection, BIND_AUTO_CREATE);
-        init();
     }
 
     @Override
@@ -404,14 +399,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onResume();
         mHandler = new Handler();
         startSensor();
-        iBeaconLibrary.startScan();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         stopSensor();
-        iBeaconLibrary.stopScan();
     }
 
     @Override
@@ -443,11 +436,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         TV_Start = (TextView)findViewById(R.id.textView_Start);
         BT_Stat = (Button) findViewById(R.id.button_Start);
         BT_Stat.setOnClickListener(this);
-        TV_textview = (TextView)findViewById(R.id.textView2);
         editText = (EditText)findViewById(R.id.editText);
-        TV_result = (TextView)findViewById(R.id.textView_Result);
-        TV_pkData = (TextView)findViewById(R.id.textView_PkData);
-//        TV_dest = (TextView)findViewById(R.id.textView_destination);
+        TV_step = (TextView)findViewById(R.id.textView_step);
+        TV_pkData = (TextView)findViewById(R.id.textView_pkData);
+        TV_navi = (TextView)findViewById(R.id.textView_navi);
         editText_dest = (EditText)findViewById(R.id.editText_dest);
         BT_bcon1 = (Button)findViewById(R.id.button_bcon1);
         BT_bcon2 = (Button)findViewById(R.id.button_bcon2);
@@ -461,15 +453,27 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         BT_show.setOnClickListener(this);
         layout_btns = (LinearLayout)findViewById(R.id.layout_buttons);
         layout_len = (LinearLayout)findViewById(R.id.layout_stepLen);
+        radioGroup = (RadioGroup)findViewById(R.id.RadioGroup);
+        radioGroup.setOnCheckedChangeListener(this);
+    }
+    
+    private String mDecimalFormat(double number) {
+        DecimalFormat df = new DecimalFormat("#.##");
+        return df.format(number);
+    }
+
+    private String mDecimalFormat(float number) {
+        DecimalFormat df = new DecimalFormat("#.##");
+        return df.format(number);
     }
 
     /***************************************************************/
     /*****************                            ******************/
-    /*****************       create pkdata        ******************/
+    /*****************    backend_data methods    ******************/
     /*****************                            ******************/
     /***************************************************************/
 
-    private void createPkData() {
+    private void createJsonData(int status) {
         try{
             pkData.put("user_id", getUserId());
             pkData.put("route_id", route_id);
@@ -477,7 +481,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             pkData.put("bpre", bpre);
             pkData.put("bcur", bcur);
             pkData.put("sgList", sgList);
-            sgList = new JSONArray();
+
+            jsonData.put("route_id", route_id);
+            if (status == IsArrived) {
+                jsonData.put("isArrived", true);
+                jsonData.put("isCanceled", false);
+            }
+            else if (status == IsCanceled) {
+                jsonData.put("isArrived", false);
+                jsonData.put("isCanceled", true);
+            }
+            else {
+                jsonData.put("isArrived", false);
+                jsonData.put("isCanceled", false);
+            }
+            jsonData.put("pkData", pkData);
+
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -492,12 +511,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         TV_pkData.setText(dataText);
     }
 
-    private void saveSegment() {
+    private void saveSegment(double orien, double distance) {
         try {
             if (last_distance != 0 && last_distance != sg_distance) {
                 JSONObject sg = new JSONObject();
-                sg.put("direction", last_orien);
-                sg.put("distance", sg_distance);
+                sg.put("direction", orien);
+                sg.put("distance", distance);
                 sgList.put(sg);
             }
         } catch (JSONException e) {
@@ -518,31 +537,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         return uniqueId.toUpperCase();
     }
 
-    /***************************************************************/
-    /*****************                            ******************/
-    /*****************         post thread        ******************/
-    /*****************                            ******************/
-    /***************************************************************/
-
-//    private Thread postThread = new Thread() {
-    private Runnable startPost = new Runnable() {
-
+    private Thread postThread = new Thread() {
         @Override
         public void run() {
             try {
                 Thread.sleep(1000);
                 URL url = new URL("http://163.13.127.174:9000/postTraj");
-//                URL url = new URL("http://192.168.100.187:9000/postTraj");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setDoOutput(true);
                 conn.setConnectTimeout(5000);
                 conn.setRequestProperty("Content-Type", "application/json");
-                byte[] data = pkData.toString().getBytes();
+                byte[] data = jsonData.toString().getBytes();
+                Log.d("PostTest", data.toString());
                 conn.setRequestProperty("Content-length", String.valueOf(data.length));
                 conn.getOutputStream().write(data);
 
                 int code = conn.getResponseCode();
+                Log.d("PostTest", "Response code: " + code);
                 if (code == 200) {
                     InputStream is = conn.getInputStream();
                     BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -558,12 +570,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     setResultInAnyThread(result);
                 }
                 else {
-                    TV_result.setText("Connecting failed.");
+                    TV_navi.setText("Connecting failed.");
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-//                String errText = e.getMessage();
-//                Log.d("ThreadErrorLog", errText);
             }
         }
     };
@@ -572,6 +582,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                Log.d("PostTest", "In runOnUiThread");
                 JSONObject jsonObject;
                 JSONArray naviArray;
                 String status, navi, naviResult = "";
@@ -579,6 +590,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     jsonObject = new JSONObject(result);
                     status = jsonObject.get("status").toString();
                     navi = jsonObject.get("navi").toString();
+                    Log.d("PostTest", "Navi: " + navi);
                     if (navi != "null") {
                         naviArray = jsonObject.getJSONArray("navi");
                         for (int i = 0; i < naviArray.length(); i++) {
@@ -592,7 +604,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     }
                     Toast toast = Toast.makeText(getApplicationContext(), status, Toast.LENGTH_SHORT);
                     toast.show();
-                    TV_result.setText(naviResult);
+                    TV_navi.setText(naviResult);
 
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -602,169 +614,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     /***************************************************************/
-    /*****************                            ******************/
-    /*****************    bluetooth & ibeacon     ******************/
-    /*****************                            ******************/
-    /***************************************************************/
-
-    private void init() {
-        mBtAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (mBtAdapter == null) {
-            Log.d("BluetoothEnable", "Cannot support bluetooth service.");
-            return;
-        }
-
-        if (!mBtAdapter.isEnabled()) {
-            Log.d("BluetoothEnable", "Please turn on bluetooth.");
-            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
-        }
-        else {
-            Log.d("BluetoothEnable", "Bluetooth is already on.");
-        }
-        iBeaconLibrary = IBeaconLibrary.getInstance();
-        iBeaconLibrary.setListener(iBeaconListener);
-        iBeaconLibrary.setBluetoothAdapter(this);
-    }
-
-    private String getBeaconID(IBeacon iBeacon) {
-        String[] beacon_uuid = iBeacon.getUuidHexStringDashed().split("-");
-        return beacon_uuid[0] + iBeacon.getMajor() + iBeacon.getMinor();
-    }
-
-    private void startScanning() {
-        Scanning_Thread = new HandlerThread("SensorData");
-        Scanning_Thread.start();
-        Scanning_Handler = new Handler(Scanning_Thread.getLooper());
-
-    }
-
-    private void stopScanning() {
-        if (Scanning_Handler != null) {
-            Scanning_Handler.removeCallbacks(run_scanning);
-            iBeaconLibrary.stopScan();
-        }
-        if (Scanning_Thread != null) {
-            Scanning_Thread.quit();
-        }
-
-    }
-
-    private Runnable run_scanning = new Runnable() {
-        @Override
-        public void run() {
-            iBeaconLibrary.startScan();
-        }
-    };
-
-    private IBeaconListener iBeaconListener = new IBeaconListener() {
-        @Override
-        public void beaconEnter(IBeacon iBeacon) {
-            Toast toast = Toast.makeText(MainActivity.this, "Enter beacon!", Toast.LENGTH_SHORT);
-            toast.show();
-
-            if (prev_beacon.equals(iBeacon))
-                return;
-
-            enter_bcon_point = sg_distance;
-        }
-
-        @Override
-        public void beaconExit(IBeacon iBeacon) {
-            Toast toast = Toast.makeText(MainActivity.this, "Exit beacon!", Toast.LENGTH_SHORT);
-            toast.show();
-
-            if (prev_beacon.equals(iBeacon))
-                return;
-
-            exit_bcon_point = sg_distance;
-            double diff = (exit_bcon_point - enter_bcon_point) / 2;
-            sg_distance = enter_bcon_point + diff;
-            bpre = bcur;
-            bcur = getBeaconID(iBeacon);
-            saveSegment();
-            last_orien = Last_Orein;
-            sg_distance = diff;
-            createPkData();
-            showDetailOfPkData();
-
-            prev_beacon = iBeacon;
-        }
-
-        @Override
-        public void beaconFound(IBeacon iBeacon) {
-            Toast toast = Toast.makeText(MainActivity.this, "Found beacon!", Toast.LENGTH_SHORT);
-            toast.show();
-            if (prev_beacon.equals(iBeacon))
-                return;
-            iBeacons.add(iBeacon);
-            SimpleDateFormat simpleDateFormat = new SimpleDateFormat("HH:mm:ss");
-            Date date = new Date(System.currentTimeMillis());
-            String text = simpleDateFormat.format(date) + "\n"
-                    + "prev_beacon: " + prev_beacon.toString() + "\n"
-                    + "now_beacon" + iBeacon.toString() + "\n";
-            TV_result.setText(TV_result.getText() + text);
-
-        }
-
-        @Override
-        public void scanState(int state) {
-            if (!StartAPP || state == IBeaconLibrary.SCAN_END_EMPTY || state == IBeaconLibrary.SCAN_END_SUCCESS) {
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        startScanning();
-                    }
-                },1000);
-            }
-        }
-
-        @Override
-        public void operationError(int status) {
-            Log.i(IBeaconLibrary.LOG_TAG, "Bluetooth error: " + status);
-        }
-    };
-
-//    private BLEService.MyBinder serviceBinder;
-//    private ServiceConnection connection = new ServiceConnection() {
-//
-//        @Override
-//        public void onServiceDisconnected(ComponentName name) {
-//            Log.d("BeaconDetect", "Service disconnected");
-//        }
-//
-//        @Override
-//        public void onServiceConnected(ComponentName name, IBinder service) {
-//            Log.d("BeaconDetect", "Service connected");
-//            Log.e("felix", "onServiceConnected:");
-//            serviceBinder = (BLEService.MyBinder) service;
-//            serviceBinder.setListener(iBeaconListener);
-//            serviceBinder.startScan();
-//
-//        }
-//    };
-
-    /***************************************************************/
-    /***************************************************************/
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch (requestCode) {
-            case PERMISSION_REQUEST_COARSE_LOCATION:
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                }
-                break;
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_ENABLE_BT) {
-            if (resultCode == Activity.RESULT_OK) {
-//                scanBeacons();
-            }
-        }
-    }
 
     private void startSensor() {
         sensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
@@ -814,7 +663,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             if(!StartSensor){
                 StartSensor = true;
                 Sensor_Handler.post(Run_Sensor);
-                Scanning_Handler.post(run_scanning);
             }
             Data_3_AXIS data_sensor = new Data_3_AXIS(event.sensor.getType(),event.values.clone(),event.timestamp);
             synchronized (mPauseLock) {
@@ -1085,7 +933,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     x -= delta_x;
                     y -= delta_y;
 
-                    writePDR("GC_First :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+                    writePDR("GC_First :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
                     First_StepsGet = false;
                     checkfunction(data_gyroscope.Gravity_Value);
                     Last_Orein = data_gyroscope.Orein;
@@ -1094,7 +942,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     last_distance = sg_distance;
                     last_orien = Last_Orein;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment();
+                        saveSegment(last_orien, sg_distance);
                         sg_distance = 0;
                     }
                     else {
@@ -1109,7 +957,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //                    x -= Math.cos(Math.toRadians((data_gyroscope.Orein + resetOrien) ))*length;
 //                    y -= Math.sin(Math.toRadians((data_gyroscope.Orein + resetOrien)))*length;
 //
-//                    writePDR("GC_Change_L :" + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+//                    writePDR("GC_Change_L :" + 1 + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
 //                    Last_Orein = data_gyroscope.Orein;
 //                    reset_count++;
 //                    is_last_change_pose = false;
@@ -1130,14 +978,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     x -= delta_x;
                     y -= delta_y;
 
-                    writePDR("GC_Change :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+                    writePDR("GC_Change :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
                     Last_Orein = data_gyroscope.Orein;
                     reset_count++;
 
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment();
+                        saveSegment(last_orien, sg_distance);
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -1160,14 +1008,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     delta_y = Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
                     x -= delta_x;
                     y -= delta_y;
-                    writePDR("GC_Less    :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+                    writePDR("GC_Less    :"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
                     Last_Orein = data_gyroscope.Orein;
                     reset_count++;
 
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment();
+                        saveSegment(last_orien, sg_distance);
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -1190,12 +1038,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     delta_y = Math.sin(Math.toRadians(data_gyroscope.Orein + resetOrien))*length;
                     x -= delta_x;
                     y -= delta_y;
-                    writePDR("GC_Normal:"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+                    writePDR("GC_Normal:"+ ST+ ","+ "," + 1 + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
 
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment();
+                        saveSegment(last_orien, sg_distance);
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -1260,19 +1108,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         resetOrien += (Last_Orein - data_gyroscope.Orein);
                         Last_Orein = data_gyroscope.Orein;
                         reset_count++;
-                        writePDR("NO_Change:" + GlobalStepsList.getLast().StartTime+ ","+  (GlobalStepsList.getLast().Steps - CheckStepChange) + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+                        writePDR("NO_Change:" + GlobalStepsList.getLast().StartTime+ ","+  (GlobalStepsList.getLast().Steps - CheckStepChange) + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
 
                     }
                     else if( Math.abs(Last_Orein - data_gyroscope.Orein) < THESHOLD_TURN){
                         resetOrien += (Last_Orein - data_gyroscope.Orein);
                         Last_Orein = data_gyroscope.Orein;
                         reset_count++;
-                        writePDR("NO_Less   :"+ GlobalStepsList.getLast().StartTime+ ","+ "," + (GlobalStepsList.getLast().Steps - CheckStepChange) + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+                        writePDR("NO_Less   :"+ GlobalStepsList.getLast().StartTime+ ","+ "," + (GlobalStepsList.getLast().Steps - CheckStepChange) + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
 
                     }
                     else {
                         Last_Orein = data_gyroscope.Orein;
-                        writePDR("NO_Normal:"+ GlobalStepsList.getLast().StartTime+ "," + "," + (GlobalStepsList.getLast().Steps - CheckStepChange) + "_" + mDecimalFormat.format(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat.format(data_gyroscope.Orein) + "_" + mDecimalFormat.format(resetOrien)   + "\r\n");
+                        writePDR("NO_Normal:"+ GlobalStepsList.getLast().StartTime+ "," + "," + (GlobalStepsList.getLast().Steps - CheckStepChange) + "_" + mDecimalFormat(data_gyroscope.Orein + resetOrien) + "_" + mDecimalFormat(data_gyroscope.Orein) + "_" + mDecimalFormat(resetOrien)   + "\r\n");
 
                     }
 //
@@ -1294,7 +1142,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     double now_orein = Last_Orein + resetOrien;
                     last_distance = sg_distance;
                     if (Math.abs(last_orien - now_orein) > 45) {
-                        saveSegment();
+                        saveSegment(last_orien, sg_distance);
                         last_orien = Last_Orein;
                         sg_distance = 0;
                     }
@@ -1352,7 +1200,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void run() {
             try {
                 while(true) {
-//                    scanBeacons();
                     synchronized (mPauseLock) {
                         while (data_sensorList.size() == 0) {
                             mPauseLock.wait();
@@ -3807,16 +3654,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     theClass.freeDraw.addPath(bundle.getInt("Step"), bundle.getFloat("Orien"),bundle.getInt("PathID"));
                     double distance = Math.sqrt(Math.pow(theClass.x,2) + Math.pow(theClass.y,2));
                     double distance2 = Math.sqrt(Math.pow(theClass.x,2) + Math.pow((theClass.y-21),2));
-                    theClass.TV_Step_Count.setText("Step Count:" + theClass.GlobalStepsList.getLast().Steps);
-                    theClass.TV_Orien.setText("Orientation:" + (theClass.data_gyroscope.Orein + theClass.resetOrien));
-                    theClass.TV_Dist.setText("Distance to destination:" + theClass.mDecimalFormat.format(distance) + " m");
-                    theClass.TV_Start.setText("Distance to starting point:" + theClass.mDecimalFormat.format(distance2)  + " m");
+                    theClass.TV_Step_Count.setText("Step Count: " + theClass.GlobalStepsList.getLast().Steps);
+                    theClass.TV_Orien.setText("Orientation: " + (theClass.data_gyroscope.Orein + theClass.resetOrien));
+                    theClass.TV_Dist.setText("Distance to destination: " + theClass.mDecimalFormat(distance) + " m");
+                    theClass.TV_Start.setText("Distance to starting point: " + theClass.mDecimalFormat(distance2)  + " m");
 
-                    String last_dis = theClass.mDecimalFormat.format(theClass.last_distance);
-                    String sg_dis = theClass.mDecimalFormat.format(theClass.sg_distance);
+                    String last_dis = theClass.mDecimalFormat(theClass.last_distance);
+                    String sg_dis = theClass.mDecimalFormat(theClass.sg_distance);
                     if (! last_dis.equals(sg_dis)) {
                         String dataText = "orien: " + theClass.last_orien + ", distance: " + sg_dis + "\n";
-//                        theClass.TV_result.setText(theClass.TV_result.getText() + dataText);
+                        theClass.TV_step.setText(theClass.TV_step.getText() + dataText);
                     }
 
                     break;
@@ -3828,6 +3675,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
         }
     }
+
     static class PDRinfo {
         public int step;
         public double orein;
